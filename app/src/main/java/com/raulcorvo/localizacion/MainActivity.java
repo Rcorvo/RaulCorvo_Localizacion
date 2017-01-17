@@ -1,17 +1,27 @@
 package com.raulcorvo.localizacion;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements LocationListener{
+
+    private static final String[] PERMISOS_LOCALIZACION = {
+            Manifest.permission.ACCESS_FINE_LOCATION};
+
+    private static final int PETICION_LOCALIZACION = 123;
 
     private static final long TIEMPO_MIN = 10 * 1000;
     private static final long DISTANCIA_MIN = 5;
@@ -30,6 +40,17 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
         setContentView(R.layout.activity_main);
 
         salida = (TextView) findViewById(R.id.salida);
+
+        if (!hayPermisoLocalizacion()) {
+            ActivityCompat.requestPermissions(this, PERMISOS_LOCALIZACION, PETICION_LOCALIZACION);
+        }
+        else{
+            init();
+        }
+
+    }
+
+    private void init(){
         manejador = (LocationManager) getSystemService(LOCATION_SERVICE);
 
         log("Proveedores de localización: \n");
@@ -45,22 +66,46 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
 
         log("Mejor proveedor: " + proveedor + "\n");
         log("Comenzamos con la última localización conocida:");
-
-        Location localizacion = manejador.getLastKnownLocation(proveedor);
-
-        muestraLocalizacion(localizacion);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // Activamos notificaciones de localización
-        manejador.requestLocationUpdates(proveedor, TIEMPO_MIN, DISTANCIA_MIN, this);
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+            manejador.requestLocationUpdates(proveedor, TIEMPO_MIN, DISTANCIA_MIN, this);
+        }
     }
     @Override
     protected void onPause() {
         super.onPause();
-        manejador.removeUpdates(this);
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+            manejador.removeUpdates(this);
+        }
+    }
+
+    private boolean hayPermiso(String perm) {
+        return (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED);
+    }
+
+    private boolean hayPermisoLocalizacion() {
+        return(hayPermiso(Manifest.permission.ACCESS_FINE_LOCATION));
+    }
+
+    private void error() {
+        Toast.makeText(this, "Permisos de localización denegados", Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch (requestCode){
+            case PETICION_LOCALIZACION:
+                if(hayPermisoLocalizacion()){
+                    init();
+                }else{
+                    error();
+                }
+                break;
+        }
     }
 
     @Override
@@ -71,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
         log("Cambia estado proveedor: " + proveedor + ", estadp=" + E[Math.max(0, status)]
-            + ", extras=" + extras + "\n");
+                + ", extras=" + extras + "\n");
     }
 
     @Override
@@ -88,6 +133,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
     private void log(String cadena) {
         salida.append(cadena + "\n");
     }
+
     private void muestraLocalizacion(Location localizacion) {
         if (localizacion == null){
             log("Localización desconocida\n");
